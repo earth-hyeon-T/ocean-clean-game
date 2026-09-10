@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>바다를 구해줘! - 2D 도트 해양 정화 게임</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=DungGeunMo&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --pixel-bg-dirty: #2c3e50;
+            --pixel-bg-clean: #1abc9c;
+            --pixel-text: #ffffff;
+            --pixel-accent: #f1c40f;
+            --pixel-danger: #e74c3c;
+            --pixel-box: #34495e;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            margin: 0;
+            padding: 0;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'DungGeunMo', sans-serif;
+            background-color: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #game-container {
+            width: 100%;
+            max-width: 480px;
+            height: 100%;
+            max-height: 840px;
+            position: relative;
+            background: linear-gradient(180deg, #1b2a47 0%, #0d1b2a 100%);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            overflow: hidden;
+            transition: background 1s ease;
+        }
+
+        .pixel-btn {
+            font-family: 'DungGeunMo', sans-serif;
+            font-size: 1.1rem;
+            color: #fff;
+            background-color: #27ae60;
+            border: 4px solid #1e8449;
+            padding: 12px 20px;
+            cursor: pointer;
+            box-shadow: inset -4px -4px 0px 0px #145a32, 4px 4px 0px 0px #000;
+            text-align: center;
+            margin-top: 15px;
+        }
+
+        .pixel-btn:active {
+            box-shadow: inset 4px 4px 0px 0px #145a32;
+            transform: translate(2px, 2px);
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            z-index: 10;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* 1. 메인 화면 */
+        #start-screen {
+            text-align: center;
+            background: rgba(13, 27, 42, 0.95);
+        }
+
+        .title {
+            font-size: 2.2rem;
+            color: var(--pixel-accent);
+            text-shadow: 3px 3px 0px #000;
+            margin-bottom: 10px;
+            line-height: 1.3;
+        }
+
+        .mascot-preview {
+            width: 80px;
+            height: 80px;
+            margin: 10px 0;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="%232ecc71" d="M4 6h8v6H4z"/><path fill="%2327ae60" d="M6 4h4v2H6zM3 8h2v2H3zM11 8h2v2h-2z"/><circle cx="6" cy="8" r="1" fill="%23000"/><circle cx="10" cy="8" r="1" fill="%23000"/><path fill="%23e74c3c" d="M7 10h2v1H7z"/></svg>');
+            background-size: contain;
+            background-repeat: no-repeat;
+            animation: bounce 1s infinite alternate;
+        }
+
+        @keyframes bounce {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-10px); }
+        }
+
+        .nickname-input {
+            font-family: 'DungGeunMo', sans-serif;
+            font-size: 1.1rem;
+            padding: 10px;
+            width: 80%;
+            max-width: 260px;
+            border: 3px solid #fff;
+            background: #2c3e50;
+            color: #fff;
+            text-align: center;
+            margin-top: 10px;
+            outline: none;
+        }
+
+        /* 튜토리얼 팝업 모달 */
+        #tutorial-modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 30;
+            padding: 20px;
+        }
+
+        .modal-box {
+            background: var(--pixel-box);
+            border: 4px solid #fff;
+            padding: 18px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 4px 4px 0px 0px #000;
+            text-align: center;
+        }
+
+        .guide-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin: 12px 0;
+            text-align: left;
+        }
+
+        .guide-card {
+            background: #1a252f;
+            border: 2px solid #fff;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8rem;
+            color: #fff;
+        }
+
+        .guide-icon {
+            width: 28px;
+            height: 28px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            flex-shrink: 0;
+        }
+
+        /* 2. 게임 진행 화면 및 상단 HUD */
+        #hud {
+            width: 100%;
+            height: 50px;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 15px;
+            font-size: 1.1rem;
+            color: #fff;
+            border-bottom: 3px solid #000;
+            z-index: 5;
+        }
+
+        #play-area {
+            flex: 1;
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        #bin-container {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            width: 84px;
+            height: 94px;
+            background: rgba(44, 62, 80, 0.85);
+            border: 3px solid #fff;
+            box-shadow: 3px 3px 0px #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            padding: 4px;
+            z-index: 6;
+            overflow: hidden;
+        }
+
+        #bin-title {
+            position: absolute;
+            top: 2px;
+            font-size: 0.65rem;
+            color: var(--pixel-accent);
+            text-shadow: 1px 1px 0px #000;
+        }
+
+        #bin-grid {
+            width: 72px;
+            height: 72px;
+            position: relative;
+        }
+
+        .stacked-item {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        #mascot-bar {
+            width: 100%;
+            height: 65px;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            gap: 12px;
+            border-top: 2px solid #000;
+            z-index: 5;
+        }
+
+        #mascot-icon {
+            width: 44px;
+            height: 44px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            flex-shrink: 0;
+        }
+
+        #mascot-dialog {
+            color: #fff;
+            font-size: 0.95rem;
+            background: #2c3e50;
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 2px solid #fff;
+            flex: 1;
+        }
+
+        .entity {
+            position: absolute;
+            width: 52px;
+            height: 52px;
+            cursor: pointer;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            transition: transform 0.1s ease;
+        }
+
+        .entity:active {
+            transform: scale(0.85);
+        }
+
+        .trash-can {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="%23bdc3c7" d="M5 2h6v12H5z"/><path fill="%23e74c3c" d="M5 5h6v5H5z"/><path fill="%237f8c8d" d="M6 1h4v1H6zM5 14h6v1H5z"/></svg>');
+        }
+        .trash-bottle {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="%2327ae60" d="M6 5h4v9H6z"/><path fill="%232ecc71" d="M7 2h2v3H7z"/><path fill="%23d35400" d="M7 1h2v1H7z"/><path fill="%23ffffff" d="M6 8h4v3H6z"/></svg>');
+        }
+        .trash-jug {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="%23e67e22" d="M4 4h8v10H4z"/><path fill="%23d35400" d="M4 2h4v2H4z"/><path fill="%23f1c40f" d="M3 5h1v4H3z"/><path fill="%23ffffff" d="M6 7h4v4H6z"/><circle cx="8" cy="9" r="1" fill="%23e74c3c"/></svg>');
+            animation: pulse 0.5s infinite alternate;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.1); }
+        }
+
+        .trash-bottle.cracked, .trash-jug.cracked {
+            filter: brightness(0.7) contrast(1.5);
+        }
+
+        .friend-fish {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="%23f39c12" d="M3 6h8v5H3z"/><path fill="%23ffffff" d="M6 6h2v5H6z"/><path fill="%23e67e22" d="M11 7h2v3h-2zM13 6h2v5h-2z"/><path fill="%2327ae60" d="M4 4h3v2H4zM4 11h3v2H4z"/><circle cx="4" cy="8" r="1.2" fill="%23ffffff"/><circle cx="4" cy="8" r="0.6" fill="%23000000"/><path fill="%23d35400" d="M8 10h1v1H8z"/></svg>');
+        }
+        .friend-turtle {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5" fill="%232ecc71"/><path fill="%2327ae60" d="M6 5h4v6H6z"/><path fill="%2327ae60" d="M1 3h3v3H1zM12 3h3v3h-3zM1 10h3v3H1zM12 10h3v3h-3z"/><circle cx="8" cy="2" r="2" fill="%232ecc71"/><circle cx="7" cy="1.5" r="0.5" fill="%23000"/><circle cx="9" cy="1.5" r="0.5" fill="%23000"/></svg>');
+        }
+
+        .fly-item {
+            position: absolute;
+            width: 32px;
+            height: 32px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            pointer-events: none;
+            z-index: 15;
+            transition: all 0.35s cubic-bezier(0.1, 0.8, 0.3, 1);
+        }
+
+        #gameover-screen {
+            background: rgba(0, 0, 0, 0.9);
+            overflow-y: auto;
+        }
+
+        .result-box {
+            background: var(--pixel-box);
+            border: 4px solid #fff;
+            padding: 15px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 4px 4px 0px 0px #000;
+        }
+
+        .ranking-box {
+            background: #1a252f;
+            border: 2px solid var(--pixel-accent);
+            padding: 10px;
+            margin: 10px 0;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        .ranking-title {
+            color: var(--pixel-accent);
+            text-align: center;
+            margin-bottom: 8px;
+            font-size: 1rem;
+        }
+
+        .ranking-list {
+            list-style: none;
+        }
+
+        .ranking-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px dashed #34495e;
+            color: #fff;
+        }
+
+        .ranking-item.my-score {
+            color: var(--pixel-accent);
+            font-weight: bold;
+        }
+
+        .info-card {
+            background: #fff;
+            color: #2c3e50;
+            padding: 10px;
+            margin: 10px 0;
+            border: 2px solid var(--pixel-accent);
+            text-align: left;
+            font-size: 0.85rem;
+            line-height: 1.3;
+        }
+
+        .info-card h4 {
+            color: #d35400;
+            margin-bottom: 3px;
+        }
+
+        .float-text {
+            position: absolute;
+            font-size: 1.2rem;
+            font-weight: bold;
+            pointer-events: none;
+            animation: floatUp 0.8s forwards ease-out;
+            z-index: 20;
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-30px); }
+        }
+
+        .shake {
+            animation: shakeAnim 0.3s ease-in-out;
+        }
+
+        @keyframes shakeAnim {
+            0%, 100% { transform: translate(0, 0); }
+            20% { transform: translate(-8px, 5px); }
+            40% { transform: translate(8px, -5px); }
+            60% { transform: translate(-5px, 2px); }
+            80% { transform: translate(5px, -2px); }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="hud">
+        <div>시간: <span id="timer-text" style="color:var(--pixel-accent);">60</span>s</div>
+        <div>점수: <span id="score-text" style="color:#2ecc71;">0</span></div>
+    </div>
+
+    <!-- 1. 메인 시작 화면 -->
+    <div id="start-screen" class="screen">
+        <h1 class="title">바다를<br>구해줘!</h1>
+        <div class="mascot-preview"></div>
+        <p style="color: #ccc; font-size: 0.95rem;">닉네임을 입력하고 게임을 시작하세요!</p>
+        <input type="text" id="nickname-input" class="nickname-input" placeholder="닉네임 (최대 6자)" maxlength="6">
+        <button class="pixel-btn" id="open-guide-btn">게임 시작</button>
+    </div>
+
+    <!-- 튜토리얼 설명 팝업 모달 -->
+    <div id="tutorial-modal" class="hidden">
+        <div class="modal-box">
+            <h2 style="color: var(--pixel-accent); font-size: 1.3rem;">🌊 위기의 바다를 구하라!</h2>
+            <p style="color: #ccc; font-size: 0.85rem; margin-top: 5px;">60초 동안 해양 쓰레기를 치워줘!</p>
+            
+            <div class="guide-grid">
+                <div class="guide-card">
+                    <div class="guide-icon trash-can"></div>
+                    <div><b>캔: 1번</b><br><span style="color:#2ecc71;">+10점</span></div>
+                </div>
+                <div class="guide-card">
+                    <div class="guide-icon trash-bottle"></div>
+                    <div><b>유리병: 2번</b><br><span style="color:#2ecc71;">+30점</span></div>
+                </div>
+                <div class="guide-card">
+                    <div class="guide-icon trash-jug"></div>
+                    <div><b>세제통: 3번!</b><br><span style="color:#f1c40f;">+50점 (빠름)</span></div>
+                </div>
+                <div class="guide-card">
+                    <div class="guide-icon friend-fish"></div>
+                    <div><b>바다 친구</b><br><span style="color:#e74c3c;">누르면 -20점!</span></div>
+                </div>
+            </div>
+
+            <p style="color: #f1c40f; font-size: 0.8rem; background: #1a252f; padding: 6px; border: 1px solid #fff;">
+                💡 <b>팁:</b> 수거함에 쓰레기 16개가 차면 <b>+100점 피버 보너스!</b>
+            </p>
+
+            <button class="pixel-btn" id="start-game-btn" style="width: 100%; margin-top: 12px;">출동! 바다 구하기</button>
+        </div>
+    </div>
+
+    <!-- 2. 게임 플레이 영역 -->
+    <div id="play-area">
+        <div id="bin-container">
+            <div id="bin-title">수거함 (0/16)</div>
+            <div id="bin-grid"></div>
+        </div>
+    </div>
+
+    <!-- 하단 마스코트 UI -->
+    <div id="mascot-bar">
+        <div id="mascot-icon"></div>
+        <div id="mascot-dialog">바다를 깨끗하게 만들어줘!</div>
+    </div>
+
+    <!-- 3. 결과 및 랭킹 화면 -->
+    <div id="gameover-screen" class="screen hidden">
+        <div class="result-box">
+            <h2 style="color: var(--pixel-accent); margin-bottom: 5px;">GAME OVER</h2>
+            <p style="font-size: 1rem; color: #fff;"><span id="player-name-display"></span> 님 결과</p>
+            <p style="font-size: 1.1rem; color: #2ecc71; margin-top: 3px;">점수: <span id="final-score">0</span>점</p>
+            
+            <div class="ranking-box">
+                <div class="ranking-title">🏆 명예의 전당 (TOP 5) 🏆</div>
+                <ul id="ranking-list" class="ranking-list"></ul>
+            </div>
+
+            <div class="info-card">
+                <h4>[알고 있나요?]</h4>
+                <p id="eco-fact">플라스틱은 바다에서 분해되는 데 엄청난 시간이 걸려요!</p>
+            </div>
+
+            <button class="pixel-btn" id="restart-btn">다시 하기</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let score = 0;
+    let stackedItems = [];
+    let timeLeft = 60;
+    let playerNickname = "바다수호자";
+    let gameInterval = null;
+    let spawnTimeout = null;
+    let entities = [];
+
+    const container = document.getElementById('game-container');
+    const playArea = document.getElementById('play-area');
+    const startScreen = document.getElementById('start-screen');
+    const tutorialModal = document.getElementById('tutorial-modal');
+    const gameoverScreen = document.getElementById('gameover-screen');
+    const openGuideBtn = document.getElementById('open-guide-btn');
+    const startGameBtn = document.getElementById('start-game-btn');
+    const restartBtn = document.getElementById('restart-btn');
+    const scoreText = document.getElementById('score-text');
+    const timerText = document.getElementById('timer-text');
+    const binTitle = document.getElementById('bin-title');
+    const binGrid = document.getElementById('bin-grid');
+    const nicknameInput = document.getElementById('nickname-input');
+    const playerNameDisplay = document.getElementById('player-name-display');
+    const finalScore = document.getElementById('final-score');
+    const ecoFact = document.getElementById('eco-fact');
+    const mascotIcon = document.getElementById('mascot-icon');
+    const mascotDialog = document.getElementById('mascot-dialog');
+    const rankingList = document.getElementById('ranking-list');
+
+    const mascotImages = {
+        normal: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="%232ecc71" d="M4 6h8v6H4z"/><path fill="%2327ae60" d="M6 4h4v2H6zM3 8h2v2H3zM11 8h2v2h-2z"/><circle cx="6" cy="8" r="1" fill="%23000"/><circle cx="10" cy="8" r="1" fill="%23000"/><path fill="%23e74c3c" d="M7 10h2v1H7z"/></svg>',
+        happy: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="%232ecc71" d="M4 5h8v6H4z"/><path fill="%2327ae60" d="M6 3h4v2H6zM3 7h2v2H3zM11 7h2v2h-2z"/><circle cx="6" cy="7" r="1" fill="%23000"/><circle cx="10" cy="7" r="1" fill="%23000"/><path fill="%23f1c40f" d="M6 9h4v2H6z"/></svg>',
+        sad: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="%232ecc71" d="M4 7h8v6H4z"/><path fill="%2327ae60" d="M6 5h4v2H6z"/><circle cx="6" cy="9" r="1" fill="%23000"/><circle cx="10" cy="9" r="1" fill="%23000"/><path fill="%233498db" d="M7 11h2v1H7zM4 10h1v2H4zM11 10h1v2h-1z"/></svg>'
+    };
+
+    const ecoFacts = [
+        "방금 치운 페트병은 바다에서 썩는 데 무려 450년이 걸려요!",
+        "매년 10만 마리 이상의 바다 동물이 플라스틱 쓰레기 때문에 아파해요.",
+        "바다로 들어간 미세 플라스틱은 결국 먹이 사슬을 통해 우리에게 돌아옵니다.",
+        "일회용 빨대 대신 종이 빨대나 재사용 빨대를 사용하면 바다를 지킬 수 있어요!",
+        "바다 쓰레기의 80%는 우리가 육지에서 버린 플라스틱에서 시작돼요."
+    ];
+
+    mascotIcon.style.backgroundImage = `url('${mascotImages.normal}')`;
+
+    // 1단계: 메인에서 [게임 시작] 누르면 닉네임 저장 후 튜토리얼 팝업 오픈
+    openGuideBtn.addEventListener('click', () => {
+        const inputVal = nicknameInput.value.trim();
+        playerNickname = inputVal ? inputVal : "무명기사";
+        tutorialModal.classList.remove('hidden');
+    });
+
+    // 2단계: 튜토리얼에서 [출동!] 누르면 인게임 시작
+    startGameBtn.addEventListener('click', () => {
+        tutorialModal.classList.add('hidden');
+        startGame();
+    });
+
+    restartBtn.addEventListener('click', () => {
+        tutorialModal.classList.remove('hidden');
+    });
+
+    function startGame() {
+        score = 0;
+        stackedItems = [];
+        binGrid.innerHTML = '';
+        binTitle.innerText = "수거함 (0/16)";
+        timeLeft = 60;
+
+        scoreText.innerText = score;
+        timerText.innerText = timeLeft;
+        playArea.querySelectorAll('.entity').forEach(e => e.remove());
+        entities = [];
+        container.style.background = 'linear-gradient(180deg, #1b2a47 0%, #0d1b2a 100%)';
+
+        startScreen.classList.add('hidden');
+        gameoverScreen.classList.add('hidden');
+        
+        setMascot('normal', `${playerNickname}님, 바다를 구해주세요!`);
+
+        clearInterval(gameInterval);
+        gameInterval = setInterval(updateTimer, 1000);
+
+        clearTimeout(spawnTimeout);
+        scheduleNextSpawn();
+    }
+
+    function updateTimer() {
+        timeLeft--;
+        timerText.innerText = timeLeft;
+
+        if (timeLeft <= 0) {
+            endGame();
+        }
+    }
+
+    function scheduleNextSpawn() {
+        if (timeLeft <= 0) return;
+
+        spawnEntity();
+
+        let delay = 800;
+        if (timeLeft < 20) delay = 300;
+        else if (timeLeft < 40) delay = 500;
+
+        spawnTimeout = setTimeout(scheduleNextSpawn, delay);
+    }
+
+    function spawnEntity() {
+        if (timeLeft <= 0) return;
+
+        const entity = document.createElement('div');
+        entity.classList.add('entity');
+
+        const rand = Math.random();
+        let type = 'can';
+        let hitsRequired = 1;
+        let lifeTime = 3500;
+
+        if (rand < 0.45) {
+            type = 'can';
+            entity.classList.add('trash-can');
+        } else if (rand < 0.70) {
+            type = 'bottle';
+            hitsRequired = 2;
+            entity.classList.add('trash-bottle');
+        } else if (rand < 0.82) {
+            type = 'jug';
+            hitsRequired = 3;
+            lifeTime = 1600;
+            entity.classList.add('trash-jug');
+        } else {
+            type = 'friend';
+            if (Math.random() < 0.5) entity.classList.add('friend-fish');
+            else entity.classList.add('friend-turtle');
+        }
+
+        const maxX = playArea.clientWidth - 55;
+        const maxY = playArea.clientHeight - 100;
+        const posX = Math.max(10, Math.floor(Math.random() * maxX));
+        const posY = Math.max(10, Math.floor(Math.random() * maxY));
+
+        entity.style.left = `${posX}px`;
+        entity.style.top = `${posY}px`;
+
+        const entityData = {
+            element: entity,
+            type: type,
+            hitsLeft: hitsRequired,
+            posX: posX,
+            posY: posY
+        };
+
+        entity.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            handleEntityClick(entityData, e.clientX, e.clientY);
+        });
+
+        playArea.appendChild(entity);
+        entities.push(entityData);
+
+        setTimeout(() => {
+            removeEntity(entityData);
+        }, lifeTime);
+    }
+
+    function handleEntityClick(data, clientX, clientY) {
+        if (data.type === 'friend') {
+            score = Math.max(0, score - 20);
+            scoreText.innerText = score;
+            showFloatText(clientX, clientY, '-20', 'var(--pixel-danger)');
+            setMascot('sad', '아앗! 바다 친구를 누르면 안 돼!');
+            container.classList.add('shake');
+            setTimeout(() => container.classList.remove('shake'), 300);
+            removeEntity(data);
+        } else {
+            data.hitsLeft--;
+
+            if (data.hitsLeft > 0) {
+                data.element.classList.add('cracked');
+                showFloatText(clientX, clientY, `연타! (${data.hitsLeft})`, 'var(--pixel-accent)');
+            } else {
+                let addedScore = 10;
+                if (data.type === 'bottle') addedScore = 30;
+                if (data.type === 'jug') addedScore = 50;
+
+                score += addedScore;
+                scoreText.innerText = score;
+
+                animateFlyAndStack(clientX, clientY, data.type);
+
+                showFloatText(clientX, clientY, `+${addedScore}`, '#2ecc71');
+                updateBgColor();
+                removeEntity(data);
+            }
+        }
+    }
+
+    function animateFlyAndStack(startX, startY, type) {
+        const flyEl = document.createElement('div');
+        flyEl.className = 'fly-item';
+        
+        if (type === 'can') flyEl.classList.add('trash-can');
+        else if (type === 'bottle') flyEl.classList.add('trash-bottle');
+        else if (type === 'jug') flyEl.classList.add('trash-jug');
+
+        flyEl.style.left = `${startX - 16}px`;
+        flyEl.style.top = `${startY - 16}px`;
+
+        document.body.appendChild(flyEl);
+
+        const binRect = binGrid.getBoundingClientRect();
+        
+        setTimeout(() => {
+            flyEl.style.left = `${binRect.left + 28}px`;
+            flyEl.style.top = `${binRect.top}px`;
+            flyEl.style.transform = 'scale(0.5)';
+        }, 20);
+
+        setTimeout(() => {
+            flyEl.remove();
+            addItemToBinGrid(type);
+        }, 360);
+    }
+
+    function addItemToBinGrid(type) {
+        if (stackedItems.length >= 16) return;
+
+        const index = stackedItems.length;
+        const row = Math.floor(index / 4);
+        const col = index % 4;
+
+        const itemEl = document.createElement('div');
+        itemEl.className = 'stacked-item';
+        if (type === 'can') itemEl.classList.add('trash-can');
+        else if (type === 'bottle') itemEl.classList.add('trash-bottle');
+        else if (type === 'jug') itemEl.classList.add('trash-jug');
+
+        itemEl.style.left = `${col * 18}px`;
+        itemEl.style.bottom = `${row * 18}px`;
+
+        binGrid.appendChild(itemEl);
+        stackedItems.push(itemEl);
+
+        binTitle.innerText = `수거함 (${stackedItems.length}/16)`;
+
+        if (stackedItems.length === 16) {
+            score += 100;
+            scoreText.innerText = score;
+            setMascot('happy', '수거함 가득 참! 보너스 +100점!');
+
+            showFloatText(window.innerWidth / 2, window.innerHeight / 2, 'FEVER BONUS! +100', 'var(--pixel-accent)');
+
+            binGrid.style.transition = 'transform 0.2s';
+            binGrid.style.transform = 'scale(1.2)';
+
+            setTimeout(() => {
+                binGrid.style.transform = 'scale(1)';
+                binGrid.innerHTML = '';
+                stackedItems = [];
+                binTitle.innerText = "수거함 (0/16)";
+            }, 400);
+        } else {
+            setMascot('happy', '수거함으로 쏙!');
+        }
+    }
+
+    function removeEntity(data) {
+        if (data.element && data.element.parentNode) {
+            data.element.parentNode.removeChild(data.element);
+        }
+        entities = entities.filter(e => e !== data);
+    }
+
+    function showFloatText(x, y, text, color) {
+        const floatEl = document.createElement('div');
+        floatEl.className = 'float-text';
+        floatEl.innerText = text;
+        floatEl.style.color = color;
+        floatEl.style.left = `${x - 20}px`;
+        floatEl.style.top = `${y - 20}px`;
+
+        document.body.appendChild(floatEl);
+        setTimeout(() => floatEl.remove(), 800);
+    }
+
+    function updateBgColor() {
+        if (score >= 600) {
+            container.style.background = 'linear-gradient(180deg, #1abc9c 0%, #16a085 100%)';
+        } else if (score >= 300) {
+            container.style.background = 'linear-gradient(180deg, #2980b9 0%, #1f4e78 100%)';
+        }
+    }
+
+    function setMascot(state, dialog) {
+        mascotIcon.style.backgroundImage = `url('${mascotImages[state]}')`;
+        mascotDialog.innerText = dialog;
+    }
+
+    function saveAndGetRanking(name, newScore) {
+        let ranks = JSON.parse(localStorage.getItem('oceanGameRanks') || '[]');
+        ranks.push({ name: name, score: newScore });
+        ranks.sort((a, b) => b.score - a.score);
+        ranks = ranks.slice(0, 5);
+        localStorage.setItem('oceanGameRanks', JSON.stringify(ranks));
+        return ranks;
+    }
+
+    function endGame() {
+        clearInterval(gameInterval);
+        clearTimeout(spawnTimeout);
+
+        playArea.querySelectorAll('.entity').forEach(e => e.remove());
+        entities = [];
+
+        playerNameDisplay.innerText = playerNickname;
+        finalScore.innerText = score;
+
+        const topRanks = saveAndGetRanking(playerNickname, score);
+        rankingList.innerHTML = '';
+        topRanks.forEach((rank, index) => {
+            const li = document.createElement('li');
+            li.className = 'ranking-item';
+            if (rank.name === playerNickname && rank.score === score) {
+                li.classList.add('my-score');
+            }
+            li.innerHTML = `<span>${index + 1}. ${rank.name}</span> <span>${rank.score}점</span>`;
+            rankingList.appendChild(li);
+        });
+
+        const randomFact = ecoFacts[Math.floor(Math.random() * ecoFacts.length)];
+        ecoFact.innerText = randomFact;
+
+        gameoverScreen.classList.remove('hidden');
+    }
+</script>
+</body>
+</html>
