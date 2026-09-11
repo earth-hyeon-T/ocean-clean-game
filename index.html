@@ -413,6 +413,15 @@
             60% { transform: translate(-5px, 2px); }
             80% { transform: translate(5px, -2px); }
         }
+        .pixel-copyright {
+    position: absolute;
+    bottom: 15px;
+    font-size: 0.75rem;
+    color: #7f8c8d;
+    text-align: center;
+    width: 100%;
+        }
+    
     </style>
 </head>
 <body>
@@ -430,6 +439,10 @@
         <p style="color: #ccc; font-size: 0.95rem;">닉네임을 입력하고 게임을 시작하세요!</p>
         <input type="text" id="nickname-input" class="nickname-input" placeholder="닉네임 (최대 6자)" maxlength="6">
         <button class="pixel-btn" id="open-guide-btn">게임 시작</button>
+        <!-- 👇 카피라이트 문구 추가 -->
+    <footer class="pixel-copyright">
+        © 2026. earth-hyeon-t. All rights reserved.
+    </footer>
     </div>
 
     <!-- 튜토리얼 설명 팝업 모달 -->
